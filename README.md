@@ -1,45 +1,37 @@
-# KAISTUDY-Drive-SYNC
-Drive Sync Algorithm for KAISTUDY
 KAISTUDY SYNC for Obsidian
+KAISTUDY SYNC is a plugin that safely and intelligently syncs your Obsidian Vault with Google Drive. Going beyond simple file backups, it ensures data integrity by managing multi-device workflows without conflicts, based on a sophisticated algorithm using a 'Master Log' and 'Local Shadow'.
 
-KAISTUDY SYNC는 당신의 Obsidian Vault를 Google Drive와 안전하고 지능적으로 동기화하는 플러그인입니다. 단순한 파일 백업을 넘어, '마스터 로그'와 '로컬 섀도우'라는 정교한 알고리즘을 기반으로 여러 기기에서의 작업을 충돌 없이 관리하며 데이터의 정합성을 보장합니다.
+✨ Key Features
+Perfect Bidirectional Sync: Flawlessly syncs all changes—creations, modifications, deletions, and even renames and moves of both files and folders—between your local vault and Google Drive.
 
+Intelligent State-Based Algorithm: Assigns a unique ID to every file and folder, recording all change history in a 'Master Log'. This fundamentally solves inefficient issues like "renaming a folder causes all its files to be re-uploaded."
 
+Safe Data Recovery: If a file disappears from Google Drive due to user error or a network issue, the plugin treats it as an accidental loss. During the next sync, it safely restores the file based on your local vault. Deletions are only executed when you explicitly delete a file within your local Obsidian Vault.
 
-✨ 핵심 기능
+Conflict Prevention & Resolution: If a conflict occurs (e.g., editing the same file on two devices simultaneously), it won't overwrite your data. Instead, it safely creates a File (Conflicted Copy YYYY-MM-DD HH-mm-ss).md file, allowing you to merge the changes yourself.
 
-완벽한 양방향 동기화: 파일과 폴더의 생성, 수정, 삭제는 물론, 이름 변경과 다른 폴더로의 이동까지 모든 변경사항을 로컬 ↔ 원격(Google Drive) 간에 완벽하게 동기화합니다.
+Automatic Sync: You can set a desired interval (in minutes) to automatically run the sync process in the background. (Of course, you can also toggle it On/Off.)
 
-지능적인 상태 기반 알고리즘: 모든 파일과 폴더에 고유 ID를 부여하고, 모든 변경 이력을 '마스터 로그'에 기록합니다. 이를 통해 "폴더 이름만 바꿨는데 모든 파일이 재업로드되는" 비효율적인 문제를 원천적으로 해결했습니다.
+Full Unicode Support: Handles all file and folder names containing Unicode characters without any issues.
 
-안전한 데이터 복구: 사용자의 실수나 네트워크 오류로 Google Drive에서 파일이 사라지더라도, 플러그인은 이를 '의도치 않은 유실'로 간주하고 다음 동기화 시 로컬 Vault에 남아있는 파일을 기준으로 안전하게 복구합니다. 삭제는 오직 로컬 Obsidian Vault에서 사용자가 직접 지웠을 때만 실행됩니다.
+🚀 How to Use
+In Obsidian, go to Community Plugins and search for KAISTUDY SYNC to install it.
 
-충돌 방지 및 해결: 만약 두 기기에서 같은 파일을 동시에 수정하는 충돌이 발생하더라도, 어느 한쪽의 데이터를 덮어쓰지 않습니다. 대신 파일 (Conflicted Copy 날짜 시간).md 와 같은 파일을 안전하게 생성하여 사용자가 직접 내용을 병합하도록 유도합니다.
+Enable the plugin in your Obsidian settings.
 
-자동 동기화: 원하는 시간(분 단위)을 설정하여 백그라운드에서 자동으로 동기화를 실행할 수 있습니다. (물론 On/Off도 가능합니다.)
+Navigate to the new KAISTUDY SYNC tab in the settings menu.
 
-한글 및 특수문자 완벽 지원: 모든 유니코드 문자로 이루어진 파일 및 폴더 이름을 문제없이 처리합니다.
+Click the Connect button and follow the on-screen instructions to authenticate your Google Account. This is a necessary step to keep your data secure.
 
-🚀 사용 방법
+Once connected, you can start a manual sync anytime by clicking the sync icon (🔄) in the left sidebar.
 
-Obsidian의 Community Plugins 브라우저에서 KAISTUDY SYNC를 검색하여 설치합니다.
+You can enable automatic sync and set your preferred sync interval (in minutes) in the settings tab.
 
-Obsidian 설정에서 플러그인을 활성화합니다.
+⚠️ Important Principles
+This plugin assumes a sequential work environment. This means you should avoid opening and working on the same vault on multiple devices at the same time. After finishing your work on one device, please run a sync to upload your changes to Google Drive before starting work on another device. Following this principle will keep your data safe.
 
-설정 메뉴에 새로 생긴 KAISTUDY SYNC 탭으로 이동합니다.
+The .obsidian folder (which contains Obsidian's configuration files) and the .trash folder are always excluded from synchronization.
 
-Connect 버튼을 누르고, 화면의 안내에 따라 Google 계정 인증을 진행합니다. 이 과정은 귀하의 데이터를 안전하게 지키기 위한 필수 절차입니다.
+Developer: JWJ (@charley031204)
 
-연결이 완료되면, 좌측 사이드바에 생긴 동기화 아이콘(🔄)을 눌러 언제든지 수동 동기화를 시작할 수 있습니다.
-
-설정 탭에서 자동 동기화를 활성화하고 원하는 동기화 주기(분)를 설정할 수 있습니다.
-
-⚠️ 중요 원칙
-
-이 플러그인은 순차적 작업 환경을 가정합니다. 즉, 여러 기기에서 동시에 같은 Vault를 열고 작업하는 것을 피해야 합니다. 한 기기에서의 작업이 끝나면, 반드시 동기화를 실행하여 변경사항을 Google Drive에 올린 후 다른 기기에서 작업을 시작해 주세요. 이 원칙만 지키면 데이터는 안전하게 동기화됩니다.
-
-Obsidian의 설정 파일이 담긴 .obsidian 폴더와 휴지통 폴더인 .trash는 동기화 대상에서 항상 제외됩니다.
-
-개발자: JWJ (@charley031204)
-
-이 플러그인은 우리의 소중한 지식이 안전하게 보존되기를 바라는 마음으로 만들어졌습니다.
+This plugin was created with the hope that our precious knowledge will be preserved safely.
