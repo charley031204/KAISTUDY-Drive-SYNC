@@ -24,67 +24,59 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // main.ts
 var main_exports = {};
 __export(main_exports, {
-  default: () => TestMobileAuthPlugin
+  default: () => TestMobileAuthPluginV2
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var OAUTH_CLIENT_ID_IOS = "234880468147-rjthdhoivaj88bspmsmr916tdp6pp519.apps.googleusercontent.com";
-var MOBILE_REDIRECT_URI_SCHEME = "kaistudy-sync";
 var AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 var SCOPES = ["https://www.googleapis.com/auth/drive"];
-var TestMobileAuthPlugin = class extends import_obsidian.Plugin {
+var TestMobileAuthPluginV2 = class extends import_obsidian.Plugin {
   async onload() {
-    console.log("Mobile Auth Debugger Plugin loaded.");
-    this.settingTab = new TestMobileAuthSettingTab(this.app, this);
+    console.log("Mobile Auth Debugger Plugin V2 loaded.");
+    this.settingTab = new TestMobileAuthSettingTabV2(this.app, this);
     this.addSettingTab(this.settingTab);
+    const reversedClientId = OAUTH_CLIENT_ID_IOS.split(".").reverse().join(".");
+    this.registerObsidianProtocolHandler(reversedClientId, (params) => {
+      this.settingTab.logMessage("!!! SUCCESS !!!");
+      this.settingTab.logMessage("Callback received from Google!");
+      this.settingTab.logMessage("Params: " + JSON.stringify(params));
+    });
   }
-  /**
-   * The core diagnostic function. It will log every step to the settings tab.
-   * @param settingsTab - The instance of the settings tab to log messages to.
-   */
   async testMobileAuth(settingsTab) {
-    settingsTab.logMessage("--- Test Started ---");
+    settingsTab.logMessage("--- Test V2 Started ---");
     try {
-      const isMobile = import_obsidian.Platform.isMobile;
-      settingsTab.logMessage(`1. Platform.isMobile check: ${isMobile}`);
-      if (!isMobile) {
-        settingsTab.logMessage("WARNING: This test is intended for mobile platforms.");
-      }
-      const testState = `test-state-${Date.now()}`;
-      settingsTab.logMessage(`2. Generated dummy state: ${testState}`);
+      settingsTab.logMessage(`1. Platform.isMobile: ${import_obsidian.Platform.isMobile}`);
+      const reversedClientId = OAUTH_CLIENT_ID_IOS.split(".").reverse().join(".");
+      const redirectUri = `${reversedClientId}:/oauth2redirect`;
+      settingsTab.logMessage(`2. Derived Redirect URI: ${redirectUri}`);
       const authUrl = new URL(AUTH_URL);
       authUrl.searchParams.set("scope", SCOPES.join(" "));
       authUrl.searchParams.set("response_type", "code");
-      authUrl.searchParams.set("state", testState);
-      authUrl.searchParams.set("access_type", "offline");
-      authUrl.searchParams.set("prompt", "consent");
+      authUrl.searchParams.set("state", `test-state-${Date.now()}`);
       authUrl.searchParams.set("client_id", OAUTH_CLIENT_ID_IOS);
-      authUrl.searchParams.set("redirect_uri", `obsidian://${MOBILE_REDIRECT_URI_SCHEME}`);
+      authUrl.searchParams.set("redirect_uri", redirectUri);
+      settingsTab.logMessage(`3. Removed PKCE params for this test.`);
       const urlString = authUrl.toString();
-      settingsTab.logMessage(`3. Constructed URL (length: ${urlString.length}):`);
+      settingsTab.logMessage(`4. Final URL (length: ${urlString.length}):`);
       settingsTab.logMessage(urlString);
-      settingsTab.logMessage("4. Attempting to call open()...");
+      settingsTab.logMessage("5. Attempting to call open()...");
       try {
         open(urlString);
-        settingsTab.logMessage("SUCCESS: open() was called without throwing an immediate error.");
+        settingsTab.logMessage("SUCCESS: open() was called without error.");
       } catch (e) {
-        settingsTab.logMessage("!!! CRITICAL ERROR !!!");
-        settingsTab.logMessage("The open() function failed with an error:");
+        settingsTab.logMessage("!!! CRITICAL ERROR calling open() !!!");
         settingsTab.logMessage(e instanceof Error ? e.message : String(e));
-        if (e instanceof Error && e.stack) {
-          settingsTab.logMessage("Stack Trace:");
-          settingsTab.logMessage(e.stack);
-        }
       }
     } catch (e) {
-      settingsTab.logMessage("!!! UNEXPECTED FATAL ERROR in test function !!!");
+      settingsTab.logMessage("!!! UNEXPECTED FATAL ERROR !!!");
       settingsTab.logMessage(e instanceof Error ? e.message : String(e));
     } finally {
-      settingsTab.logMessage("--- Test Finished ---");
+      settingsTab.logMessage("--- Test V2 Finished ---");
     }
   }
 };
-var TestMobileAuthSettingTab = class extends import_obsidian.PluginSettingTab {
+var TestMobileAuthSettingTabV2 = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.logArea = null;
@@ -93,32 +85,25 @@ var TestMobileAuthSettingTab = class extends import_obsidian.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Mobile Authentication Debugger" });
-    containerEl.createEl("p", { text: "Click the button below to run the authentication test for iPad. Results will be shown in the log area." });
-    new import_obsidian.Setting(containerEl).setName("Run Mobile Auth Test").setDesc("This will attempt to generate an auth URL and open the browser.").addButton((button) => button.setButtonText("Run Test").setCta().onClick(() => {
-      if (this.logArea) {
-        this.logArea.setText("");
-      }
+    containerEl.createEl("h2", { text: "Mobile Auth Debugger V2" });
+    containerEl.createEl("p", { text: "This version uses the reversed client ID for the redirect URI." });
+    new import_obsidian.Setting(containerEl).setName("Run Mobile Auth Test").addButton((button) => button.setButtonText("Run Test V2").setCta().onClick(() => {
+      var _a;
+      (_a = this.logArea) == null ? void 0 : _a.setText("Starting test...");
       this.plugin.testMobileAuth(this);
     }));
     containerEl.createEl("h3", { text: "Live Log Output" });
-    this.logArea = containerEl.createEl("pre", {
-      cls: "mobile-auth-debugger-log",
-      text: "Logs will appear here..."
-    });
-    this.logArea.setAttr("style", "background-color: #222; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; font-family: monospace;");
+    this.logArea = containerEl.createEl("pre", { cls: "mobile-auth-debugger-log" });
+    this.logArea.setAttr("style", "background-color: #222; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; font-family: monospace; min-height: 50px;");
+    this.logMessage("Ready to test.");
   }
-  /**
-   * Appends a message to our mini-console in the settings tab.
-   * @param message - The string or error object to log.
-   */
   logMessage(message) {
     if (!this.logArea)
       return;
     const timestamp = (/* @__PURE__ */ new Date()).toLocaleTimeString();
-    const currentText = this.logArea.getText();
-    const newText = currentText === "Logs will appear here..." ? `[${timestamp}] ${message}` : `${currentText}
-[${timestamp}] ${message}`;
-    this.logArea.setText(newText);
+    const newLogEntry = document.createElement("div");
+    newLogEntry.setText(`[${timestamp}] ${message}`);
+    this.logArea.appendChild(newLogEntry);
+    this.logArea.scrollTop = this.logArea.scrollHeight;
   }
 };
