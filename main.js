@@ -910,27 +910,42 @@ ${msg}`);
       return;
     }
     this.isAuthenticating = true;
-    this.authState = this.bufferToBase64Url(crypto.getRandomValues(new Uint8Array(16)).buffer);
-    const { verifier, challenge } = await this.generatePKCE();
-    this.authCodeVerifier = verifier;
-    const authUrl = new URL(AUTH_URL);
-    authUrl.searchParams.append("scope", SCOPES.join(" "));
-    authUrl.searchParams.append("response_type", "code");
-    authUrl.searchParams.append("state", this.authState);
-    authUrl.searchParams.append("code_challenge", challenge);
-    authUrl.searchParams.append("code_challenge_method", "S256");
-    authUrl.searchParams.append("access_type", "offline");
-    if (import_obsidian.Platform.isDesktop) {
-      this.stopCallbackServer();
-      authUrl.searchParams.append("client_id", DESKTOP_CLIENT_ID);
-      authUrl.searchParams.append("redirect_uri", DESKTOP_REDIRECT_URI);
-      this.startCallbackServer();
+    let authUrl;
+    try {
+      console.log("Starting login process...");
+      this.authState = this.bufferToBase64Url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+      const { verifier, challenge } = await this.generatePKCE();
+      this.authCodeVerifier = verifier;
+      authUrl = new URL(AUTH_URL);
+      authUrl.searchParams.append("scope", SCOPES.join(" "));
+      authUrl.searchParams.append("response_type", "code");
+      authUrl.searchParams.append("state", this.authState);
+      authUrl.searchParams.append("code_challenge", challenge);
+      authUrl.searchParams.append("code_challenge_method", "S256");
+      authUrl.searchParams.append("access_type", "offline");
+      if (import_obsidian.Platform.isDesktop) {
+        this.stopCallbackServer();
+        authUrl.searchParams.append("client_id", DESKTOP_CLIENT_ID);
+        authUrl.searchParams.append("redirect_uri", DESKTOP_REDIRECT_URI);
+        this.startCallbackServer();
+      } else {
+        const mobileRedirectUri = `obsidian://plugin/${this.manifest.id}/callback`;
+        authUrl.searchParams.append("client_id", MOBILE_CLIENT_ID);
+        authUrl.searchParams.append("redirect_uri", mobileRedirectUri);
+      }
+      console.log("Generated Auth URL:", authUrl.toString());
       window.open(authUrl.toString());
-    } else {
-      const mobileRedirectUri = `obsidian://plugin/${this.manifest.id}/callback`;
-      authUrl.searchParams.append("client_id", MOBILE_CLIENT_ID);
-      authUrl.searchParams.append("redirect_uri", mobileRedirectUri);
-      window.open(authUrl.toString());
+      setTimeout(() => {
+        if (this.isAuthenticating) {
+          console.error("Authentication timed out after 3 minutes.");
+          new import_obsidian.Notice("Authentication timed out. Please try again.");
+          this.isAuthenticating = false;
+        }
+      }, 18e4);
+    } catch (error) {
+      console.error("Fatal error during login process:", error);
+      new import_obsidian.Notice("Could not start login process. Please check console for errors.");
+      this.isAuthenticating = false;
     }
   }
   // --- END: AUTHENTICATION REFACTOR ---
