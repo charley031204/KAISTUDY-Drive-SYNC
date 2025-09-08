@@ -39,7 +39,6 @@ __export(main_exports, {
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var http = __toESM(require("http"));
-var import_crypto = require("crypto");
 var DESKTOP_CLIENT_ID = "234880468147-ra36kvpnhqrnrrqjkp9uvk5ko18tfl28.apps.googleusercontent.com";
 var DESKTOP_CLIENT_SECRET = "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";
 var MOBILE_CLIENT_ID = "234880468147-22f5esf56l0g329ll511nh6gimimnqkk.apps.googleusercontent.com";
@@ -59,7 +58,9 @@ var DEFAULT_SETTINGS = {
   localShadow: { items: {}, deleted: {} }
 };
 function generateSyncId() {
-  return (0, import_crypto.randomBytes)(16).toString("hex");
+  const array = new Uint8Array(16);
+  crypto.getRandomValues(array);
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 async function calculateSha256(arrayBuffer) {
   const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
@@ -876,20 +877,47 @@ ${msg}`);
       throw error;
     }
   }
+  // --- START: AUTHENTICATION REFACTOR ---
+  /**
+   * Converts an ArrayBuffer to a Base64URL-encoded string.
+   * This is required for PKCE code challenge generation.
+   * @param buffer The ArrayBuffer to convert.
+   * @returns A Base64URL-encoded string.
+   */
+  bufferToBase64Url(buffer) {
+    return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  /**
+   * Asynchronously generates PKCE (Proof Key for Code Exchange) values.
+   * Uses the Web Crypto API, which is available on both desktop and mobile platforms,
+   * ensuring compatibility and eliminating the need for platform-specific code.
+   * @returns A promise that resolves with the code verifier and code challenge.
+   */
+  async generatePKCE() {
+    const verifierArray = crypto.getRandomValues(new Uint8Array(32));
+    const verifier = this.bufferToBase64Url(verifierArray.buffer);
+    const challengeBuffer = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+    const challenge = this.bufferToBase64Url(challengeBuffer);
+    return { verifier, challenge };
+  }
+  /**
+   * Initiates the Google OAuth2 login flow.
+   * This function is now async to handle the asynchronous generation of PKCE values.
+   */
   async login() {
     if (this.isAuthenticating) {
       new import_obsidian.Notice("Authentication is already in progress.");
       return;
     }
     this.isAuthenticating = true;
-    this.authState = (0, import_crypto.randomBytes)(16).toString("hex");
-    this.authCodeVerifier = (0, import_crypto.randomBytes)(32).toString("base64url");
-    const codeChallenge = (0, import_crypto.createHash)("sha256").update(this.authCodeVerifier).digest("base64url");
+    this.authState = this.bufferToBase64Url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+    const { verifier, challenge } = await this.generatePKCE();
+    this.authCodeVerifier = verifier;
     const authUrl = new URL(AUTH_URL);
     authUrl.searchParams.append("scope", SCOPES.join(" "));
     authUrl.searchParams.append("response_type", "code");
     authUrl.searchParams.append("state", this.authState);
-    authUrl.searchParams.append("code_challenge", codeChallenge);
+    authUrl.searchParams.append("code_challenge", challenge);
     authUrl.searchParams.append("code_challenge_method", "S256");
     authUrl.searchParams.append("access_type", "offline");
     if (import_obsidian.Platform.isDesktop) {
@@ -905,6 +933,7 @@ ${msg}`);
       window.open(authUrl.toString());
     }
   }
+  // --- END: AUTHENTICATION REFACTOR ---
   startCallbackServer() {
     this.server = http.createServer(async (req, res) => {
       try {
