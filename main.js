@@ -40,11 +40,12 @@ module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
 var http = __toESM(require("http"));
 var import_crypto = require("crypto");
-var CLIENT_ID = "234880468147-ra36kvpnhqrnrrqjkp9uvk5ko18tfl28.apps.googleusercontent.com";
-var CLIENT_SECRET = "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";
+var DESKTOP_CLIENT_ID = "234880468147-ra36kvpnhqrnrrqjkp9uvk5ko18tfl28.apps.googleusercontent.com";
+var DESKTOP_CLIENT_SECRET = "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";
+var MOBILE_CLIENT_ID = "234880468147-22f5esf56l0g329ll511nh6gimimnqkk.apps.googleusercontent.com";
 var APP_FOLDER_NAME = "ObsidianGoogleSyncApp";
 var LOG_FILE_NAME = ".googlesync-log.json";
-var REDIRECT_URI = "http://127.0.0.1:42813/callback";
+var DESKTOP_REDIRECT_URI = "http://127.0.0.1:42813/callback";
 var AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 var TOKEN_URL = "https://oauth2.googleapis.com/token";
 var DRIVE_API_URL = "https://www.googleapis.com/drive/v3";
@@ -83,6 +84,21 @@ var GoogleDriveSyncPlugin = class extends import_obsidian.Plugin {
     this.addSettingTab(new GoogleDriveSyncSettingTab(this.app, this));
     this.addRibbonIcon("sync", "Sync with Google Drive", () => this.syncVault());
     this.toggleAutoSync();
+    this.registerObsidianProtocolHandler("plugin/kaistudy-sync/callback", async (params) => {
+      if (this.isAuthenticating) {
+        const code = params.code;
+        const state = params.state;
+        if (state !== this.authState) {
+          new import_obsidian.Notice("Authentication failed: state mismatch.");
+          console.error("OAuth state mismatch");
+          this.isAuthenticating = false;
+          return;
+        }
+        if (code) {
+          await this.exchangeCodeForToken(code, this.authCodeVerifier);
+        }
+      }
+    });
   }
   onunload() {
     this.stopCallbackServer();
@@ -364,7 +380,6 @@ var GoogleDriveSyncPlugin = class extends import_obsidian.Plugin {
     const actions = [];
     const localBySyncId = /* @__PURE__ */ new Map();
     const shadowBySyncId = new Map(Object.entries(localShadow.items));
-    const trackedLocalPaths = /* @__PURE__ */ new Set();
     const shadowByPath = new Map(Object.values(localShadow.items).map((item) => [item.path, item]));
     const unmatchedShadowItems = new Map(shadowBySyncId);
     const unmatchedLocalItems = new Map(localState);
@@ -402,7 +417,6 @@ var GoogleDriveSyncPlugin = class extends import_obsidian.Plugin {
     }
     for (const [syncId, lItem] of localBySyncId.entries()) {
       const sItem = shadowBySyncId.get(syncId);
-      trackedLocalPaths.add(lItem.path);
       if (lItem.path !== sItem.path) {
         const lItemParentPath = lItem.item.parent ? lItem.item.parent.path : "";
         const sItemParentPath = sItem.path.includes("/") ? sItem.path.substring(0, sItem.path.lastIndexOf("/")) : "";
@@ -464,7 +478,8 @@ var GoogleDriveSyncPlugin = class extends import_obsidian.Plugin {
       }
     }
     for (const sItem of unmatchedShadowItems.values()) {
-      actions.push({ type: "DELETE_REMOTE", log: sItem });
+      if (!localBySyncId.has(sItem.syncId))
+        actions.push({ type: "DELETE_REMOTE", log: sItem });
     }
     for (const lItem of unmatchedLocalItems.values()) {
       if (lItem.isFolder)
@@ -852,7 +867,7 @@ ${msg}`);
       return null;
     }
     try {
-      const response = await (0, import_obsidian.requestUrl)({ method: "POST", url: TOKEN_URL, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, refresh_token: this.settings.refreshToken, grant_type: "refresh_token" }).toString() });
+      const response = await (0, import_obsidian.requestUrl)({ method: "POST", url: TOKEN_URL, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: DESKTOP_CLIENT_ID, client_secret: DESKTOP_CLIENT_SECRET, refresh_token: this.settings.refreshToken, grant_type: "refresh_token" }).toString() });
       return response.json.access_token;
     } catch (error) {
       console.error("Access token refresh error:", error);
@@ -862,7 +877,6 @@ ${msg}`);
     }
   }
   async login() {
-    this.stopCallbackServer();
     if (this.isAuthenticating) {
       new import_obsidian.Notice("Authentication is already in progress.");
       return;
@@ -870,24 +884,25 @@ ${msg}`);
     this.isAuthenticating = true;
     this.authState = (0, import_crypto.randomBytes)(16).toString("hex");
     this.authCodeVerifier = (0, import_crypto.randomBytes)(32).toString("base64url");
-    try {
-      const codeChallenge = (0, import_crypto.createHash)("sha256").update(this.authCodeVerifier).digest("base64url");
-      const authUrl = new URL(AUTH_URL);
-      authUrl.searchParams.append("client_id", CLIENT_ID);
-      authUrl.searchParams.append("redirect_uri", REDIRECT_URI);
-      authUrl.searchParams.append("response_type", "code");
-      authUrl.searchParams.append("scope", SCOPES.join(" "));
-      authUrl.searchParams.append("state", this.authState);
-      authUrl.searchParams.append("code_challenge", codeChallenge);
-      authUrl.searchParams.append("code_challenge_method", "S256");
-      authUrl.searchParams.append("access_type", "offline");
-      authUrl.searchParams.append("prompt", "consent");
+    const codeChallenge = (0, import_crypto.createHash)("sha256").update(this.authCodeVerifier).digest("base64url");
+    const authUrl = new URL(AUTH_URL);
+    authUrl.searchParams.append("scope", SCOPES.join(" "));
+    authUrl.searchParams.append("response_type", "code");
+    authUrl.searchParams.append("state", this.authState);
+    authUrl.searchParams.append("code_challenge", codeChallenge);
+    authUrl.searchParams.append("code_challenge_method", "S256");
+    authUrl.searchParams.append("access_type", "offline");
+    if (import_obsidian.Platform.isDesktop) {
+      this.stopCallbackServer();
+      authUrl.searchParams.append("client_id", DESKTOP_CLIENT_ID);
+      authUrl.searchParams.append("redirect_uri", DESKTOP_REDIRECT_URI);
       this.startCallbackServer();
       window.open(authUrl.toString());
-    } catch (error) {
-      console.error("Crypto error:", error);
-      new import_obsidian.Notice("Could not create crypto challenge.");
-      this.isAuthenticating = false;
+    } else {
+      const mobileRedirectUri = `obsidian://plugin/${this.manifest.id}/callback`;
+      authUrl.searchParams.append("client_id", MOBILE_CLIENT_ID);
+      authUrl.searchParams.append("redirect_uri", mobileRedirectUri);
+      window.open(authUrl.toString());
     }
   }
   startCallbackServer() {
@@ -895,7 +910,7 @@ ${msg}`);
       try {
         if (!req.url)
           throw new Error("Invalid request");
-        const url = new URL(req.url, REDIRECT_URI);
+        const url = new URL(req.url, DESKTOP_REDIRECT_URI);
         const code = url.searchParams.get("code");
         const receivedState = url.searchParams.get("state");
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -930,7 +945,25 @@ ${msg}`);
   }
   async exchangeCodeForToken(code, codeVerifier) {
     try {
-      const response = await (0, import_obsidian.requestUrl)({ method: "POST", url: TOKEN_URL, headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, code, code_verifier: codeVerifier, grant_type: "authorization_code", redirect_uri: REDIRECT_URI }).toString() });
+      const params = new URLSearchParams({
+        code,
+        code_verifier: codeVerifier,
+        grant_type: "authorization_code"
+      });
+      if (import_obsidian.Platform.isDesktop) {
+        params.append("client_id", DESKTOP_CLIENT_ID);
+        params.append("client_secret", DESKTOP_CLIENT_SECRET);
+        params.append("redirect_uri", DESKTOP_REDIRECT_URI);
+      } else {
+        params.append("client_id", MOBILE_CLIENT_ID);
+        params.append("redirect_uri", `obsidian://plugin/${this.manifest.id}/callback`);
+      }
+      const response = await (0, import_obsidian.requestUrl)({
+        method: "POST",
+        url: TOKEN_URL,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString()
+      });
       const tokens = response.json;
       if (tokens.refresh_token) {
         this.settings.refreshToken = tokens.refresh_token;
@@ -943,6 +976,8 @@ ${msg}`);
     } catch (error) {
       console.error("Token exchange error:", error);
       new import_obsidian.Notice("Failed to connect to Google Drive.");
+    } finally {
+      this.isAuthenticating = false;
     }
   }
   async fetchUserEmail(accessToken) {
